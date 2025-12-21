@@ -3,37 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Film</title>
+  <title>Vizionare & descărcare</title>
 
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 900px;
-      margin: 40px auto;
-      padding: 0 16px;
-      background: #fff;
-    }
-
-    h1 {
-      margin-bottom: 12px;
-    }
-
-    .player {
-      position: relative;
-    }
-
-    video {
-      width: 100%;
-      height: auto;
-      background: #000;
-    }
-
-    /* Subtitrare overlay (fallback) */
-    #subtitle {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 12%;
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 16px; }
+    .wrap { position: relative; margin: 16px 0; }
+    video { width: 100%; height: auto; background: #000; }
+    #cap {
+      position: absolute; left: 0; right: 0; bottom: 12%;
       padding: 10px 16px;
       text-align: center;
       background: rgba(0,0,0,0.6);
@@ -44,85 +21,96 @@
       white-space: pre-line;
       display: none;
     }
+    a.button {
+      display: inline-block; padding: 12px 16px; border: 1px solid #222; text-decoration: none;
+      border-radius: 8px;
+    }
   </style>
 </head>
-<body>
 
+<body>
   <h1>Film</h1>
 
-  <div class="player">
-    <video id="video" controls preload="metadata" crossorigin="anonymous">
-      <source
-        src="https://yuniott.xyz/movie/CMP6HA3/WU7CDLU/1355553.mp4"
-        type="video/mp4"
-      />
+  <script>
+    // IMPORTANT: pune aici linkul care știi sigur că merge în browser (HTTPS)
+    const VIDEO_URL = "PASTEAZA_AICI_LINKUL_TAU_MP4_CARE_MERGE";
+    const VTT_URL = "/subtitles/avatar-en.vtt";
+  </script>
 
-      <!-- Track standard (pentru browsere care afișează CC) -->
-      <track
-        kind="captions"
-        src="/subtitles/avatar-en.vtt"
-        srclang="ro"
-        label="Română"
-        default
-      />
+  <div class="wrap">
+    <video id="v" controls preload="metadata" crossorigin="anonymous">
+      <source id="src" src="" type="video/mp4" />
+      Browserul tău nu suportă redarea video.
     </video>
-
-    <!-- Overlay subtitrare (fallback sigur) -->
-    <div id="subtitle"></div>
+    <div id="cap"></div>
   </div>
 
-  <script>
-    const video = document.getElementById("video");
-    const box = document.getElementById("subtitle");
+  <p>
+    <a class="button" id="dl" href="#" download rel="noopener">Descarcă MP4</a>
+  </p>
 
-    function toSeconds(t) {
-      const [h, m, s] = t.split(":");
-      return (+h) * 3600 + (+m) * 60 + parseFloat(s);
+  <script>
+    // Setează sursa video + link download
+    const video = document.getElementById("v");
+    const srcEl = document.getElementById("src");
+    const dl = document.getElementById("dl");
+    srcEl.src = VIDEO_URL;
+    dl.href = VIDEO_URL;
+    video.load();
+
+    // Subtitrare overlay din VTT
+    const cap = document.getElementById("cap");
+
+    function toSec(t) {
+      // 00:01:23.456
+      const [hh, mm, ss] = t.split(":");
+      return (+hh)*3600 + (+mm)*60 + parseFloat(ss);
     }
 
-    function parseVTT(text) {
+    function parseVTT(vtt) {
       const cues = [];
-      const blocks = text.replace(/\r/g, "").split("\n\n");
-
-      for (const block of blocks) {
-        const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
+      const blocks = vtt.replace(/\r/g, "").split("\n\n");
+      for (const b of blocks) {
+        const lines = b.split("\n").map(s => s.trim()).filter(Boolean);
         if (!lines.length || lines[0] === "WEBVTT") continue;
 
-        const time = lines.find(l => l.includes("-->"));
-        if (!time) continue;
+        const timeLine = lines.find(l => l.includes("-->"));
+        if (!timeLine) continue;
 
-        const [a, b] = time.split("-->");
-        const start = toSeconds(a.trim());
-        const end = toSeconds(b.trim().split(" ")[0]);
-        const textLines = lines.filter(l => l !== time && !/^\d+$/.test(l));
+        const [a, rest] = timeLine.split("-->");
+        const start = toSec(a.trim());
+        const end = toSec(rest.trim().split(" ")[0]);
 
-        cues.push({
-          start,
-          end,
-          text: textLines.join("\n")
-        });
+        const textLines = lines.filter(l => l !== timeLine && !/^\d+$/.test(l));
+        const text = textLines.join("\n");
+
+        cues.push({ start, end, text });
       }
-      return cues;
+      return cues.sort((x, y) => x.start - y.start);
     }
 
-    fetch("/subtitles/avatar-en.vtt")
-      .then(r => r.text())
-      .then(vtt => {
-        const cues = parseVTT(vtt);
-        box.style.display = "block";
+    fetch(VTT_URL)
+      .then(r => {
+        if (!r.ok) throw new Error("Nu pot încărca VTT: " + r.status);
+        return r.text();
+      })
+      .then(text => {
+        const cues = parseVTT(text);
+        cap.style.display = "block";
 
         function render() {
           const t = video.currentTime;
+          // căutare simplă (ok pentru început)
           const cue = cues.find(c => t >= c.start && t <= c.end);
-          box.textContent = cue ? cue.text : "";
+          cap.textContent = cue ? cue.text : "";
           requestAnimationFrame(render);
         }
         render();
       })
       .catch(() => {
-        box.style.display = "none";
+        // dacă nu găsește VTT, nu stricăm video-ul
+        cap.style.display = "none";
       });
   </script>
-
 </body>
 </html>

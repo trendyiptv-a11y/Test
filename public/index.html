@@ -1,14 +1,128 @@
-<video controls preload="metadata" crossorigin="anonymous">
-  <source
-    src="https://yuniott.xyz/movie/CMP6HA3/WU7CDLU/1355553.mp4"
-    type="video/mp4"
-  />
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Film</title>
 
-  <track
-    kind="captions"
-    src="/subtitles/avatar-en.vtt"
-    srclang="en"
-    label="English"
-    default
-  />
-</video>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 16px;
+      background: #fff;
+    }
+
+    h1 {
+      margin-bottom: 12px;
+    }
+
+    .player {
+      position: relative;
+    }
+
+    video {
+      width: 100%;
+      height: auto;
+      background: #000;
+    }
+
+    /* Subtitrare overlay (fallback) */
+    #subtitle {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 12%;
+      padding: 10px 16px;
+      text-align: center;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      font-size: 18px;
+      line-height: 1.35;
+      pointer-events: none;
+      white-space: pre-line;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Film</h1>
+
+  <div class="player">
+    <video id="video" controls preload="metadata" crossorigin="anonymous">
+      <source
+        src="https://yuniott.xyz/movie/CMP6HA3/WU7CDLU/1355553.mp4"
+        type="video/mp4"
+      />
+
+      <!-- Track standard (pentru browsere care afișează CC) -->
+      <track
+        kind="captions"
+        src="/subtitles/avatar-en.vtt"
+        srclang="ro"
+        label="Română"
+        default
+      />
+    </video>
+
+    <!-- Overlay subtitrare (fallback sigur) -->
+    <div id="subtitle"></div>
+  </div>
+
+  <script>
+    const video = document.getElementById("video");
+    const box = document.getElementById("subtitle");
+
+    function toSeconds(t) {
+      const [h, m, s] = t.split(":");
+      return (+h) * 3600 + (+m) * 60 + parseFloat(s);
+    }
+
+    function parseVTT(text) {
+      const cues = [];
+      const blocks = text.replace(/\r/g, "").split("\n\n");
+
+      for (const block of blocks) {
+        const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
+        if (!lines.length || lines[0] === "WEBVTT") continue;
+
+        const time = lines.find(l => l.includes("-->"));
+        if (!time) continue;
+
+        const [a, b] = time.split("-->");
+        const start = toSeconds(a.trim());
+        const end = toSeconds(b.trim().split(" ")[0]);
+        const textLines = lines.filter(l => l !== time && !/^\d+$/.test(l));
+
+        cues.push({
+          start,
+          end,
+          text: textLines.join("\n")
+        });
+      }
+      return cues;
+    }
+
+    fetch("/subtitles/avatar-en.vtt")
+      .then(r => r.text())
+      .then(vtt => {
+        const cues = parseVTT(vtt);
+        box.style.display = "block";
+
+        function render() {
+          const t = video.currentTime;
+          const cue = cues.find(c => t >= c.start && t <= c.end);
+          box.textContent = cue ? cue.text : "";
+          requestAnimationFrame(render);
+        }
+        render();
+      })
+      .catch(() => {
+        box.style.display = "none";
+      });
+  </script>
+
+</body>
+</html>

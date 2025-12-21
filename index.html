@@ -3,21 +3,31 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Film cu subtitrare</title>
+  <title>Vizionare & descărcare</title>
   <style>
     body { font-family: Arial, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 16px; }
-    video { width: 100%; height: auto; }
+    video { width: 100%; height: auto; margin: 16px 0; }
+    a.button {
+      display: inline-block; padding: 12px 16px; border: 1px solid #222; text-decoration: none;
+      border-radius: 8px;
+    }
   </style>
 </head>
 <body>
   <h1>Film</h1>
 
-  <video controls preload="metadata" crossorigin="anonymous">
-    <!-- Pune aici URL-ul tău autorizat către MP4 -->
+  <video controls preload="metadata">
     <source src="http://yuniott.xyz:80/movie/CMP6HA3/WU7CDLU/1355553.mp4" type="video/mp4" />
-
-    <!-- Subtitrarea generată automat de workflow -->
-    <track kind="subtitles" src="/subtitles/ro.vtt" srclang="ro" label="Română (auto)" default />
+    Browserul tău nu suportă redarea video.
   </video>
+
+  <p>
+    <a class="button"
+       href="http://yuniott.xyz:80/movie/CMP6HA3/WU7CDLU/1355553.mp4"
+       download
+       rel="noopener">
+      Descarcă MP4
+    </a>
+  </p>
 </body>
 </html>

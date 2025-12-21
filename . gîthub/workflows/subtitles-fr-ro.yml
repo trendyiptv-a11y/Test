@@ -1,0 +1,57 @@
+name: Generate Romanian subtitles from French (VTT)
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: "Direct MP4 URL (authorized)"
+        required: true
+        type: string
+
+jobs:
+  subtitles:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -U openai-whisper
+          pip install -U "torch==2.*" --index-url https://download.pytorch.org/whl/cpu
+          pip install -U transformers sentencepiece
+
+      - name: Download video
+        run: |
+          mkdir -p assets
+          curl -L "${{ inputs.video_url }}" -o assets/film.mp4
+
+      - name: Extract audio (mono 16k WAV)
+        run: |
+          ffmpeg -y -i assets/film.mp4 -vn -ac 1 -ar 16000 assets/audio.wav
+
+      - name: Transcribe French to VTT (timestamps)
+        run: |
+          mkdir -p tmp
+          whisper assets/audio.wav --language French --task transcribe --format vtt --output_dir tmp
+          test -f tmp/audio.vtt
+
+      - name: Translate VTT French -> Romanian
+        run: |
+          python scripts/translate_vtt_fr_ro.py tmp/audio.vtt subtitles/ro.vtt
+
+      - name: Commit subtitles
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add subtitles/ro.vtt
+          git commit -m "Update auto Romanian subtitles (from French)" || echo "No changes"
+          git push

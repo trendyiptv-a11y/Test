@@ -16,10 +16,17 @@
 <body>
   <h1>Film</h1>
 
-  <video controls preload="metadata">
-    <source src="http://yuniott.xyz:80/movie/CMP6HA3/WU7CDLU/1355553.mp4" type="video/mp4" />
-    Browserul tău nu suportă redarea video.
-  </video>
+  <video controls preload="metadata" crossorigin="anonymous">
+  <source src="https://yuniott.xyz/movie/CMP6HA3/WU7CDLU/1355553.mp4" type="video/mp4" />
+
+  <track
+    kind="subtitles"
+    src="/subtitles/avatar-en.vtt"
+    srclang="en"
+    label="English"
+    default
+  />
+</video>
 
   <p>
     <a class="button"

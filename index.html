@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Film cu subtitrare</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 16px; }
+    video { width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+  <h1>Film</h1>
+
+  <video controls preload="metadata" crossorigin="anonymous">
+    <!-- Pune aici URL-ul tău autorizat către MP4 -->
+    <source src="VIDEO_URL" type="video/mp4" />
+
+    <!-- Subtitrarea generată automat de workflow -->
+    <track kind="subtitles" src="/subtitles/ro.vtt" srclang="ro" label="Română (auto)" default />
+  </video>
+</body>
+</html>

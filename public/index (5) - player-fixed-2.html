@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Film</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 980px; margin: 24px auto; padding: 0 16px; background:#f7f7f7; color:#111; }
+    h1 { margin: 0 0 14px; font-size: 28px; }
+    .bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:10px 0; }
+    .player { position: relative; margin: 16px 0; }
+    video { width:100%; height:auto; min-height:220px; background:#000; border-radius:12px; outline:none; }
+    button, select, input, a.button {
+      border:1px solid #222; background:#fff; color:#111; padding:10px 12px; border-radius:10px;
+      font-size:14px; text-decoration:none; box-sizing:border-box;
+    }
+    input[type="url"] { flex: 1 1 360px; min-width: 220px; }
+    button:active, a.button:active { transform: translateY(1px); }
+    #cap {
+      position:absolute; left:0; right:0; bottom:12%; padding:10px 14px; text-align:center;
+      background:rgba(0,0,0,.60); color:#fff; line-height:1.35; pointer-events:none;
+      white-space:pre-line; border-radius:10px; margin:0 10px; display:none;
+      text-shadow:0 1px 2px rgba(0,0,0,.7);
+    }
+    #status { color:#444; font-size:13px; min-height:18px; margin-top:8px; }
+    .hint { color:#444; font-size:13px; }
+  </style>
+</head>
+<body>
+  <h1>Film</h1>
+
+  <div class="bar">
+    <input id="urlInput" type="url" placeholder="Lipește aici URL MP4 / M3U8" />
+    <button id="insertUrl">Insert URL</button>
+    <button id="playUrl">Play URL</button>
+    <button id="downloadBtn">Download</button>
+    <a id="openBtn" class="button" href="#" target="_blank" rel="noopener">Open direct</a>
+  </div>
+
+  <div class="bar">
+    <button id="toggle">Subtitrări: ON</button>
+    <button id="smaller">A-</button>
+    <button id="bigger">A+</button>
+    <label>
+      Limbă:
+      <select id="lang">
+        <option value="ro" selected>Română</option>
+        <option value="en">English</option>
+      </select>
+    </label>
+  </div>
+
+  <div id="status"></div>
+
+  <div class="player">
+    <video id="v" controls preload="metadata" playsinline webkit-playsinline>
+      Browserul tău nu suportă redarea video.
+    </video>
+    <div id="cap"></div>
+  </div>
+
+  <p class="hint">
+    Pentru compatibilitate mai bună pe TV/browser, playerul folosește direct <b>video.src</b>. Dacă un server blochează download-ul, folosește <b>Open direct</b>.
+  </p>
+
+  <script>
+    const DEFAULT_VIDEO_URL = "https://download.samplelib.com/mp4/sample-5s.mp4";
+    const VTT = {
+      ro: "/subtitles/avatar-en.vtt",
+      en: "/subtitles/avatar-en.vtt"
+    };
+
+    const video = document.getElementById("v");
+    const cap = document.getElementById("cap");
+    const statusEl = document.getElementById("status");
+    const urlInput = document.getElementById("urlInput");
+    const insertUrlBtn = document.getElementById("insertUrl");
+    const playUrlBtn = document.getElementById("playUrl");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const openBtn = document.getElementById("openBtn");
+
+    const toggleBtn = document.getElementById("toggle");
+    const smallerBtn = document.getElementById("smaller");
+    const biggerBtn = document.getElementById("bigger");
+    const langSel = document.getElementById("lang");
+
+    let currentVideoUrl = "";
+    let cues = [];
+    let enabled = true;
+    let fontSize = 18;
+
+    function setStatus(text) {
+      statusEl.textContent = text || "";
+    }
+
+    function normalizeUrl(value) {
+      const url = (value || "").trim();
+      if (!url) return "";
+      if (/^https?:\/\//i.test(url)) return url;
+      return url;
+    }
+
+    function guessFileName(url) {
+      try {
+        const u = new URL(url, window.location.href);
+        const last = u.pathname.split("/").filter(Boolean).pop() || "video.mp4";
+        return last.includes(".") ? last : "video.mp4";
+      } catch {
+        return "video.mp4";
+      }
+    }
+
+    function updateOpenLinks(url) {
+      openBtn.href = url || "#";
+      openBtn.setAttribute("download", guessFileName(url || "video.mp4"));
+    }
+
+    async function playCurrentUrl() {
+      const url = normalizeUrl(currentVideoUrl || urlInput.value);
+      if (!url) {
+        setStatus("Introdu un URL valid.");
+        return;
+      }
+
+      currentVideoUrl = url;
+      urlInput.value = url;
+      localStorage.setItem("lastVideoUrl", url);
+      updateOpenLinks(url);
+
+      cap.textContent = "";
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+      video.src = url;
+      video.load();
+
+      try {
+        const playPromise = video.play();
+        if (playPromise && typeof playPromise.then === "function") {
+          await playPromise;
+        }
+        setStatus("Redare pornită.");
+      } catch (err) {
+        setStatus("URL încărcat. Dacă nu pornește automat, apasă Play din player sau Open direct.");
+        console.error(err);
+      }
+    }
+
+    function askForUrl() {
+      const value = prompt("Inserează URL MP4 / M3U8", urlInput.value || currentVideoUrl || DEFAULT_VIDEO_URL);
+      if (value && value.trim()) {
+        urlInput.value = value.trim();
+        currentVideoUrl = value.trim();
+        updateOpenLinks(currentVideoUrl);
+        setStatus("URL inserat.");
+      }
+    }
+
+    function downloadCurrentVideo() {
+      const url = normalizeUrl(currentVideoUrl || urlInput.value);
+      if (!url) {
+        setStatus("Nu există URL pentru download.");
+        return;
+      }
+      currentVideoUrl = url;
+      updateOpenLinks(url);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = guessFileName(url);
+      a.target = "_blank";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setStatus("S-a trimis comanda de download / open. Dacă serverul blochează download-ul, folosește Open direct.");
+    }
+
+    function toSec(t) {
+      const [hh, mm, ss] = t.split(":");
+      return (+hh) * 3600 + (+mm) * 60 + parseFloat(ss);
+    }
+
+    function parseVTT(vtt) {
+      const out = [];
+      const blocks = vtt.replace(/\r/g, "").split("\n\n");
+      for (const block of blocks) {
+        const lines = block.split("\n").map(s => s.trim()).filter(Boolean);
+        if (!lines.length) continue;
+        if (lines[0] === "WEBVTT") continue;
+        const timeLine = lines.find(l => l.includes("-->"));
+        if (!timeLine) continue;
+        const [a, rest] = timeLine.split("-->");
+        const start = toSec(a.trim());
+        const end = toSec(rest.trim().split(" ")[0]);
+        const textLines = lines.filter(l => l !== timeLine && !/^\d+$/.test(l));
+        out.push({ start, end, text: textLines.join("\n") });
+      }
+      out.sort((x, y) => x.start - y.start);
+      return out;
+    }
+
+    async function loadSubtitles(lang) {
+      const url = VTT[lang] || VTT.ro;
+      const r = await fetch(url, { cache: "no-store" });
+      if (!r.ok) throw new Error("Nu pot încărca VTT: " + url + " (" + r.status + ")");
+      const text = await r.text();
+      if (!text.startsWith("WEBVTT")) throw new Error("Fișierul nu pare WebVTT: " + url);
+      cues = parseVTT(text);
+    }
+
+    function setCaptionVisible(on) {
+      enabled = on;
+      toggleBtn.textContent = "Subtitrări: " + (enabled ? "ON" : "OFF");
+      cap.style.display = enabled ? "block" : "none";
+      if (!enabled) cap.textContent = "";
+    }
+
+    function setFontSize(px) {
+      fontSize = Math.max(12, Math.min(34, px));
+      cap.style.fontSize = fontSize + "px";
+    }
+
+    function render() {
+      if (enabled && cues.length) {
+        const t = video.currentTime;
+        const cue = cues.find(c => t >= c.start && t <= c.end);
+        cap.textContent = cue ? cue.text : "";
+      }
+      requestAnimationFrame(render);
+    }
+
+    insertUrlBtn.addEventListener("click", askForUrl);
+    playUrlBtn.addEventListener("click", playCurrentUrl);
+    downloadBtn.addEventListener("click", downloadCurrentVideo);
+    urlInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") playCurrentUrl();
+    });
+
+    video.addEventListener("loadedmetadata", () => setStatus("Video încărcat."));
+    video.addEventListener("playing", () => setStatus("Redare pornită."));
+    video.addEventListener("error", () => {
+      const err = video.error;
+      const code = err ? err.code : "?";
+      setStatus("Nu pot reda acest link în player (eroare video " + code + "). Încearcă Open direct sau alt MP4.");
+    });
+
+    toggleBtn.addEventListener("click", () => setCaptionVisible(!enabled));
+    smallerBtn.addEventListener("click", () => setFontSize(fontSize - 2));
+    biggerBtn.addEventListener("click", () => setFontSize(fontSize + 2));
+
+    langSel.addEventListener("change", async () => {
+      try {
+        cap.textContent = "Se încarcă subtitrarea…";
+        await loadSubtitles(langSel.value);
+        if (enabled) cap.textContent = "";
+      } catch (e) {
+        cap.textContent = "Subtitrare indisponibilă.";
+        console.error(e);
+      }
+    });
+
+    (async () => {
+      setFontSize(fontSize);
+      setCaptionVisible(true);
+      const saved = localStorage.getItem("lastVideoUrl");
+      currentVideoUrl = normalizeUrl(saved || DEFAULT_VIDEO_URL);
+      urlInput.value = currentVideoUrl;
+      updateOpenLinks(currentVideoUrl);
+      try {
+        await loadSubtitles(langSel.value);
+      } catch (e) {
+        try {
+          langSel.value = "en";
+          await loadSubtitles("en");
+        } catch (_) {
+          setCaptionVisible(false);
+        }
+        console.error(e);
+      }
+      render();
+    })();
+  </script>
+</body>
+</html>

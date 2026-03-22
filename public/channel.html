@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Canal TV</title>
+  <style>
+    *{ box-sizing:border-box; }
+
+    html,body{
+      margin:0;
+      min-height:100%;
+      background:#08101f;
+      color:#fff;
+      font-family:Arial, Helvetica, sans-serif;
+    }
+
+    body{
+      padding:16px;
+    }
+
+    .wrap{
+      max-width:1200px;
+      margin:0 auto;
+    }
+
+    .panel{
+      background:#0f172a;
+      border:1px solid #243244;
+      border-radius:18px;
+      padding:18px;
+      margin-bottom:18px;
+    }
+
+    .brand{
+      display:inline-block;
+      padding:8px 12px;
+      border-radius:999px;
+      background:#1e293b;
+      border:1px solid #334155;
+      color:#fff;
+      font-size:14px;
+      margin-bottom:12px;
+    }
+
+    h1{
+      margin:0 0 8px;
+      font-size:34px;
+      line-height:1.15;
+    }
+
+    .meta{
+      color:#cbd5e1;
+      font-size:16px;
+      line-height:1.5;
+      margin-bottom:14px;
+    }
+
+    .actions{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-top:14px;
+    }
+
+    button, a.btn{
+      min-height:56px;
+      min-width:180px;
+      border:none;
+      border-radius:14px;
+      padding:12px 18px;
+      color:#fff;
+      font-size:20px;
+      font-weight:bold;
+      cursor:pointer;
+      background:#374151;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .btn-blue{ background:#2563eb; }
+    .btn-green{ background:#16a34a; }
+    .btn-gray{ background:#4b5563; }
+
+    button:focus, a.btn:focus{
+      outline:4px solid #facc15;
+      outline-offset:3px;
+    }
+
+    .message{
+      margin-top:16px;
+      padding:14px 16px;
+      border-radius:14px;
+      font-size:18px;
+      line-height:1.5;
+      background:#3f2f0b;
+      border:1px solid #6b4f12;
+      color:#fde68a;
+      min-height:56px;
+    }
+
+    .message.ok{
+      background:#14532d;
+      border-color:#166534;
+      color:#bbf7d0;
+    }
+
+    .message.err{
+      background:#7f1d1d;
+      border-color:#991b1b;
+      color:#fecaca;
+    }
+
+    .player-wrap{
+      background:#000;
+      border-radius:16px;
+      overflow:hidden;
+      border:1px solid #243244;
+    }
+
+    video{
+      width:100%;
+      min-height:280px;
+      max-height:70vh;
+      background:#000;
+      display:block;
+    }
+
+    .info{
+      margin-top:14px;
+      padding:12px 14px;
+      border-radius:12px;
+      background:#111827;
+      border:1px solid #334155;
+      color:#cbd5e1;
+      font-size:14px;
+      word-break:break-all;
+    }
+
+    @media (max-width: 820px){
+      h1{ font-size:28px; }
+      button, a.btn{
+        width:100%;
+        min-width:0;
+        font-size:18px;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="panel">
+    <div class="brand">COEZIV TV • CANAL</div>
+    <h1 id="channelTitle">Canal</h1>
+    <div class="meta" id="channelMeta">Se pregătește redarea...</div>
+
+    <div class="player-wrap">
+      <video id="tvVideo" controls autoplay playsinline></video>
+    </div>
+
+    <div id="messageBox" class="message">Se încarcă...</div>
+
+    <div class="actions">
+      <button id="btnBack" class="btn-gray" type="button" onclick="goBack()">Înapoi la listă</button>
+      <button id="btnPrev" class="btn-blue" type="button" onclick="prevChannel()">Canal anterior</button>
+      <button id="btnNext" class="btn-blue" type="button" onclick="nextChannel()">Canal următor</button>
+      <a id="btnDirect" class="btn btn-green" href="#" target="_self">Deschide direct</a>
+    </div>
+
+    <div class="info" id="urlInfo"></div>
+  </div>
+
+</div>
+
+<script>
+  var channels = [];
+  var currentIndex = 0;
+  var video = null;
+
+  function setMessage(text, type){
+    var box = document.getElementById("messageBox");
+    box.className = "message";
+    if(type === "ok"){ box.className += " ok"; }
+    if(type === "err"){ box.className += " err"; }
+    box.innerHTML = escapeHtml(text || "");
+  }
+
+  function escapeHtml(text){
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function getParam(name){
+    var params = new URLSearchParams(window.location.search);
+    return params.get(name) || "";
+  }
+
+  function loadChannels(){
+    try{
+      channels = JSON.parse(localStorage.getItem("coeziv_tv_channels") || "[]");
+    }catch(e){
+      channels = [];
+    }
+  }
+
+  function resolveCurrentIndex(){
+    var idx = parseInt(getParam("i"), 10);
+    if(isNaN(idx)){ idx = 0; }
+
+    if(idx < 0){ idx = 0; }
+    if(idx >= channels.length){ idx = channels.length - 1; }
+
+    currentIndex = idx;
+  }
+
+  function updateUI(){
+    if(!channels.length || !channels[currentIndex]){
+      document.getElementById("channelTitle").innerHTML = "Canal indisponibil";
+      document.getElementById("channelMeta").innerHTML = "Nu există date pentru canal.";
+      document.getElementById("urlInfo").innerHTML = "Playlistul nu este disponibil.";
+      setMessage("Nu pot încărca acest canal.", "err");
+      return;
+    }
+
+    var ch = channels[currentIndex];
+    document.getElementById("channelTitle").innerHTML = escapeHtml(ch.name || "Canal");
+    document.getElementById("channelMeta").innerHTML =
+      "Canal " + (currentIndex + 1) + " din " + channels.length;
+
+    document.getElementById("urlInfo").innerHTML =
+      "Sursă: " + escapeHtml(ch.url || "");
+
+    var directBtn = document.getElementById("btnDirect");
+    directBtn.href = ch.url || "#";
+
+    localStorage.setItem("coeziv_tv_last_channel_name", ch.name || "");
+    localStorage.setItem("coeziv_tv_last_channel_url", ch.url || "");
+  }
+
+  function playCurrentChannel(){
+    if(!channels.length || !channels[currentIndex]){
+      setMessage("Canal invalid.", "err");
+      return;
+    }
+
+    var ch = channels[currentIndex];
+    updateUI();
+
+    if(!video){ return; }
+
+    try{
+      video.pause();
+    }catch(e){}
+
+    video.removeAttribute("src");
+    video.load();
+
+    setMessage("Se încearcă redarea: " + (ch.name || "Canal"), "");
+    video.src = ch.url || "";
+
+    var playPromise = null;
+    try{
+      playPromise = video.play();
+    }catch(e){
+      setMessage("Browserul nu a pornit redarea automat.", "err");
+    }
+
+    if(playPromise && typeof playPromise.then === "function"){
+      playPromise.then(function(){
+        setMessage("Redare pornită.", "ok");
+      }).catch(function(){
+        setMessage("Redarea directă nu a pornit. Poți încerca «Deschide direct».", "err");
+      });
+    }
+  }
+
+  function nextChannel(){
+    if(!channels.length){ return; }
+    currentIndex++;
+    if(currentIndex >= channels.length){
+      currentIndex = 0;
+    }
+    playCurrentChannel();
+  }
+
+  function prevChannel(){
+    if(!channels.length){ return; }
+    currentIndex--;
+    if(currentIndex < 0){
+      currentIndex = channels.length - 1;
+    }
+    playCurrentChannel();
+  }
+
+  function goBack(){
+    window.location.href = "tv-player.html";
+  }
+
+  function handleKeys(e){
+    var key = e.key || "";
+    var code = e.keyCode || 0;
+
+    if(key === "ArrowRight" || code === 39 || code === 34 || code === 427){
+      e.preventDefault();
+      nextChannel();
+      return;
+    }
+
+    if(key === "ArrowLeft" || code === 37 || code === 33 || code === 428){
+      e.preventDefault();
+      prevChannel();
+      return;
+    }
+
+    if(key === "Backspace" || key === "Escape" || code === 8 || code === 27 || code === 461){
+      e.preventDefault();
+      goBack();
+      return;
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", function(){
+    video = document.getElementById("tvVideo");
+
+    loadChannels();
+    resolveCurrentIndex();
+    updateUI();
+    playCurrentChannel();
+
+    if(video){
+      video.addEventListener("playing", function(){
+        setMessage("Redare pornită.", "ok");
+      });
+
+      video.addEventListener("error", function(){
+        setMessage("Canalul nu pornește în playerul web. Încearcă «Deschide direct».", "err");
+      });
+
+      video.addEventListener("waiting", function(){
+        setMessage("Se încarcă bufferul...", "");
+      });
+    }
+
+    document.addEventListener("keydown", handleKeys);
+  });
+</script>
+</body>
+</html>
